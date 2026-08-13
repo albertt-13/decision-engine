@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: decision
+      POSTGRES_PASSWORD: decision_dev
+      POSTGRES_DB: decision_db
+    ports: ["5434:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decision"]
+      interval: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:8
+    ports: ["27019:27017"]
+    volumes: [mongodata:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6381:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  decision-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports: ["4100:4100"]
+    environment:
+      NODE_ENV: production
+      PORT: 4100
+      DATABASE_URL: postgresql://decision:decision_dev@postgres:5432/decision_db
+      MONGODB_URL: mongodb://mongo:27017/decision_engine
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-change-in-prod
+      OPERATOR_EMAIL: operador@decision-engine.local
+      # hash de "operador123" - solo para dev local
+      OPERATOR_PASSWORD_HASH: $$2b$$12$$5jRW3iO4zDognAvYuhqZ/.KcrIdOM4QDekpkJTf89h43lrDqrDG4S
+      ORDERFLOW_BASE_URL: https://orderflow-api-gateway-my23.onrender.com
+      AGGREGATION_CRON_SCHEDULE: "*/10 * * * *"
+      LIVE_MODE_MAX_PER_HOUR: 20
+      CORS_ORIGINS: http://localhost:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  mongodata:

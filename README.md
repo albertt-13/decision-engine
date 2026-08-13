@@ -47,25 +47,29 @@ entera.
 ```
 src/
 ├── domain/                 # reglas de negocio puras, cero imports de infraestructura
-│   ├── recommendation/     # entidad Recommendation + motor de reglas
-│   └── executionMode/      # lógica de shadow/live
+│   ├── recommendation/     # entidad Recommendation + motor de reglas (2 reglas, ver abajo)
+│   ├── executionMode/      # lógica de shadow/live + guardrail
+│   └── catalog/             # ProductProfile, categorizador por keyword, simulador de métricas
 ├── ports/                  # interfaces que el dominio define y la infra implementa
 │   ├── DataSource.ts
 │   ├── RecommendationRepository.ts
 │   ├── SystemConfigRepository.ts
 │   ├── SalesSnapshotRepository.ts
+│   ├── ProductProfileRepository.ts
 │   └── RateLimiter.ts
 ├── application/             # casos de uso: orquestan dominio + puertos
 │   ├── GenerateRecommendation.ts
 │   ├── ToggleExecutionMode.ts
-│   └── RunAggregationPipeline.ts
+│   ├── RunAggregationPipeline.ts
+│   ├── SyncProductCatalog.ts
+│   └── ListProductProfiles.ts
 ├── adapters/
 │   ├── inbound/
 │   │   ├── http/            # Express: routes, controllers — llaman casos de uso
 │   │   └── cron/             # dispara RunAggregationPipeline periódicamente
 │   └── outbound/
 │       ├── postgres/         # PrismaRecommendationRepository, PrismaSystemConfigRepository
-│       ├── mongo/             # MongoSalesSnapshotRepository
+│       ├── mongo/             # MongoSalesSnapshotRepository, MongoProductProfileRepository
 │       ├── redis/             # RedisRateLimiter
 │       └── orderflow/         # OrderFlowDataSource
 └── shared/                   # logger, config/env, errores — cross-cutting, sin lógica de negocio
@@ -178,6 +182,50 @@ tendencia en el tiempo (¿subió o bajó de ranking?) sin que OrderFlow necesite
 Vive en Mongo porque es escritura frecuente, append-only, sin relaciones — forzarlo a una tabla
 relacional no aportaría nada, solo rigidez.
 
+**MongoDB (colección `productProfiles`) — catálogo enriquecido:**
+
+```typescript
+interface ProductProfileDocument {
+  id: string;
+  sku: string;               // nomenclatura CAT-SUB-#### — ver abajo
+  orderFlowProductId: string; // link al producto real en OrderFlow
+  name: string;
+  price: string;
+  category: { code: string; name: string };
+  subcategory: { code: string; name: string };
+  marketing: {
+    viewCount: number;
+    addToCartCount: number;
+    purchaseCount: number;
+    cartAbandonmentRate: number;    // 0-1, derivado: 1 - purchase/addToCart
+    conversionRate: number;         // 0-1, derivado: purchase/views
+    avgTimeInCartSeconds: number;
+    avgDecisionTimeSeconds: number;
+    peakPurchaseHour: number;       // 0-23
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+> ⚠️ **Las métricas de `marketing` son SIMULADAS, no reales.** OrderFlow solo trackea pedidos
+> confirmados (no vistas, no carrito, no tiempos de navegación) — no hay de dónde sacar esos
+> datos de verdad sin instrumentar tracking en OrderFlow, que está fuera del alcance de esta
+> mutación. Se generan con `simulateMarketingMetrics()` (`domain/catalog/`), con un funnel
+> internamente consistente (vistas → % que agrega al carrito → % de eso que compra — los 3
+> conteos se relacionan entre sí, no son 3 números al azar sin relación) para poder construir y
+> probar el motor de reglas que sí los consume, sin depender de tener tráfico real. Queda
+> visible en el dashboard, no escondido.
+
+**Nomenclatura de SKU — `CAT-SUB-####`:** categoría (3 letras) + subcategoría (3 letras) +
+secuencia (4 dígitos, con padding). Ej.: `AUD-AUR-0001` = Audio → Auriculares → primer producto
+de esa subcategoría. La categorización es por reglas de keyword sobre el nombre del producto
+(`domain/catalog/ProductCategorizer.ts`) — determinística y auditable, mismo criterio que el
+motor de recomendaciones: se puede explicar exactamente por qué un producto cayó en una
+categoría, no es una caja negra. Categorías hoy: `COM` (Cómputo), `PAN` (Pantallas), `PER`
+(Periféricos), `AUD` (Audio), `CON` (Conectividad y Energía), `MOB` (Mobiliario), `OFI`
+(Oficina), con `GEN-PRO` como fallback si ninguna regla matchea.
+
 ## Endpoints
 
 | Método | Ruta | Auth | Qué hace |
@@ -188,8 +236,23 @@ relacional no aportaría nada, solo rigidez.
 | GET | `/recommendations/config` | operador | Modo actual (`SHADOW`/`LIVE`) |
 | PATCH | `/recommendations/config` | operador | Cambia el modo global |
 | GET | `/reports/sales-snapshots` | operador | Serie histórica de `SalesSnapshot`, para el dashboard |
+| GET | `/catalog` | operador | Lista los `ProductProfile` (SKU, categoría, métricas de marketing) |
+| POST | `/catalog/sync` | operador | Trae el catálogo de OrderFlow y crea un perfil para cada producto nuevo — idempotente, no duplica ni pisa perfiles existentes |
 | GET | `/health` | — | Health real: Postgres, Redis, Mongo |
 | GET | `/live` | — | Liveness puro, sin dependencias — lo que usa Render para decidir reinicios (ver mini-ADR de OrderFlow, mismo criterio aplicado desde el arranque acá) |
+
+## Motor de reglas
+
+Dos reglas independientes, combinadas en cada corrida y deduplicadas (si un producto matchea las
+dos, se recomienda una sola vez):
+
+1. **`top-3-bestseller-no-recomendado-recientemente`** — datos reales de OrderFlow
+   (`GET /products/bestsellers`). "Este producto se vende bien, sigamos empujándolo."
+2. **`alto-abandono-carrito-recuperable`** — datos simulados de `ProductProfile`: productos con
+   ≥50% de abandono de carrito y ≥100 vistas (el piso de vistas evita recomendar por 2 vistas y 1
+   abandono, que es ruido, no señal). "Hay interés real que no se convirtió, vale una campaña de
+   recuperación." Es la traducción directa de "la empresa mejora ventas con técnicas de
+   marketing, midiendo el carrito" a una regla ejecutable.
 
 ## Shadow mode y guardrail
 
@@ -234,6 +297,10 @@ frontend/src/
   `POST /recommendations`), toggle de modo shadow/live, lista de recomendaciones con el `reason`
   siempre visible (la auditabilidad tiene que verse en la UI, no solo existir en la base) y un
   badge de modo por cada una.
+- **Catálogo** (`/catalog`) — tabla de `ProductProfile`: SKU, categoría, precio, y las métricas
+  de marketing (vistas, conversión, abandono de carrito resaltado si es alto, tiempo en carrito,
+  hora pico) — con la aclaración de "simulado" visible en la propia pantalla, no solo en el
+  código. Botón "Sincronizar catálogo" dispara `POST /catalog/sync`.
 - **Tendencia de ventas** (`/snapshots`) — gráfico de línea (Recharts) + tabla de
   `SalesSnapshot`, un color por producto.
 

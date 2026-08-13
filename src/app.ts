@@ -14,6 +14,7 @@ import { errorHandler } from "./adapters/inbound/http/middleware/errorHandler.js
 import { authRouter } from "./adapters/inbound/http/auth/auth.routes.js";
 import { recommendationsRouter } from "./adapters/inbound/http/recommendations/recommendations.routes.js";
 import { reportsRouter } from "./adapters/inbound/http/reports/reports.routes.js";
+import { catalogRouter } from "./adapters/inbound/http/catalog/catalog.routes.js";
 
 export const app = express();
 
@@ -51,5 +52,6 @@ app.get("/health", async (_req, res) => {
 app.use("/auth", authRouter);
 app.use("/recommendations", recommendationsRouter);
 app.use("/reports", reportsRouter);
+app.use("/catalog", catalogRouter);
 
 app.use(errorHandler);

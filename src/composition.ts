@@ -2,12 +2,15 @@ import { OrderFlowDataSource } from "./adapters/outbound/orderflow/OrderFlowData
 import { PrismaRecommendationRepository } from "./adapters/outbound/postgres/PrismaRecommendationRepository.js";
 import { PrismaSystemConfigRepository } from "./adapters/outbound/postgres/PrismaSystemConfigRepository.js";
 import { MongoSalesSnapshotRepository } from "./adapters/outbound/mongo/MongoSalesSnapshotRepository.js";
+import { MongoProductProfileRepository } from "./adapters/outbound/mongo/MongoProductProfileRepository.js";
 import { RedisRateLimiter } from "./adapters/outbound/redis/RedisRateLimiter.js";
 import { GenerateRecommendation } from "./application/GenerateRecommendation.js";
 import { ToggleExecutionMode } from "./application/ToggleExecutionMode.js";
 import { RunAggregationPipeline } from "./application/RunAggregationPipeline.js";
 import { ListRecommendations } from "./application/ListRecommendations.js";
 import { GetSalesSnapshots } from "./application/GetSalesSnapshots.js";
+import { SyncProductCatalog } from "./application/SyncProductCatalog.js";
+import { ListProductProfiles } from "./application/ListProductProfiles.js";
 import { env } from "./shared/config/env.js";
 
 /**
@@ -21,6 +24,7 @@ const dataSource = new OrderFlowDataSource();
 const recommendationRepo = new PrismaRecommendationRepository();
 const systemConfigRepo = new PrismaSystemConfigRepository();
 const snapshotRepo = new MongoSalesSnapshotRepository();
+const productProfileRepo = new MongoProductProfileRepository();
 const rateLimiter = new RedisRateLimiter();
 
 export const useCases = {
@@ -29,10 +33,13 @@ export const useCases = {
     recommendationRepo,
     systemConfigRepo,
     rateLimiter,
+    productProfileRepo,
     env.LIVE_MODE_MAX_PER_HOUR,
   ),
   toggleExecutionMode: new ToggleExecutionMode(systemConfigRepo),
   runAggregationPipeline: new RunAggregationPipeline(dataSource, snapshotRepo),
   listRecommendations: new ListRecommendations(recommendationRepo),
   getSalesSnapshots: new GetSalesSnapshots(snapshotRepo),
+  syncProductCatalog: new SyncProductCatalog(dataSource, productProfileRepo),
+  listProductProfiles: new ListProductProfiles(productProfileRepo),
 };

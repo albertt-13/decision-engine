@@ -3,6 +3,7 @@ import type { DataSource } from "../ports/DataSource.js";
 import type { RecommendationRepository } from "../ports/RecommendationRepository.js";
 import type { SystemConfigRepository } from "../ports/SystemConfigRepository.js";
 import type { RateLimiter } from "../ports/RateLimiter.js";
+import type { ProductProfileRepository } from "../ports/ProductProfileRepository.js";
 import { Recommendation, type RecommendationMode } from "../domain/recommendation/Recommendation.js";
 import { evaluateRecommendationRules } from "../domain/recommendation/RecommendationRules.js";
 import { isValidExecutionMode, isWithinLiveModeGuardrail, type ExecutionMode } from "../domain/executionMode/ExecutionMode.js";
@@ -25,12 +26,14 @@ export class GenerateRecommendation {
     private readonly recommendationRepo: RecommendationRepository,
     private readonly systemConfigRepo: SystemConfigRepository,
     private readonly rateLimiter: RateLimiter,
+    private readonly productProfileRepo: ProductProfileRepository,
     private readonly maxLivePerHour: number,
   ) {}
 
   async execute(): Promise<Recommendation[]> {
-    const [bestsellers, recentTargetRefs, modeValue] = await Promise.all([
+    const [bestsellers, productProfiles, recentTargetRefs, modeValue] = await Promise.all([
       this.dataSource.getBestsellers(BESTSELLERS_LIMIT),
+      this.productProfileRepo.findAll(),
       this.recommendationRepo.findRecentTargetRefs(RECENT_DEDUP_WINDOW_HOURS),
       this.systemConfigRepo.get(EXECUTION_MODE_KEY),
     ]);
@@ -39,6 +42,7 @@ export class GenerateRecommendation {
 
     const decisions = evaluateRecommendationRules({
       bestsellers,
+      productProfiles,
       recentlyRecommendedProductIds: recentTargetRefs,
     });
 

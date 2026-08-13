@@ -183,11 +183,13 @@ relacional no aportaría nada, solo rigidez.
 | Método | Ruta | Auth | Qué hace |
 |---|---|---|---|
 | POST | `/auth/login` | — | Login del operador (usuario único, ver "Stack") |
-| GET | `/recommendations` | operador | Genera y/o lista recomendaciones actuales |
-| GET | `/recommendations/config` | operador | Modo actual (`shadow`/`live`) |
-| PATCH | `/recommendations/config` | operador | Cambia el modo — sujeto al guardrail de rate limit |
+| POST | `/recommendations` | operador | Corre el motor de reglas contra datos frescos y persiste el resultado |
+| GET | `/recommendations?mode=` | operador | Lista recomendaciones existentes, filtrable por modo |
+| GET | `/recommendations/config` | operador | Modo actual (`SHADOW`/`LIVE`) |
+| PATCH | `/recommendations/config` | operador | Cambia el modo global |
 | GET | `/reports/sales-snapshots` | operador | Serie histórica de `SalesSnapshot`, para el dashboard |
-| GET | `/health` | — | Health real: Postgres, Redis, y la conectividad con OrderFlow |
+| GET | `/health` | — | Health real: Postgres, Redis, Mongo |
+| GET | `/live` | — | Liveness puro, sin dependencias — lo que usa Render para decidir reinicios (ver mini-ADR de OrderFlow, mismo criterio aplicado desde el arranque acá) |
 
 ## Shadow mode y guardrail
 

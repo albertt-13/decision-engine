@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://user:pass@localhost:5432/decision_db
+      MONGODB_URL: mongodb://localhost:27017/decision_engine
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-secret
+      OPERATOR_EMAIL: operador@decision-engine.local
+      OPERATOR_PASSWORD_HASH: $2b$12$5jRW3iO4zDognAvYuhqZ/.KcrIdOM4QDekpkJTf89h43lrDqrDG4S
+      ORDERFLOW_BASE_URL: https://orderflow-api-gateway-my23.onrender.com
+      LIVE_MODE_MAX_PER_HOUR: 20
+      CORS_ORIGINS: http://localhost:5173
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Prisma no necesita una conexion real para generar el client, pero
+      # prisma.config.ts sí necesita ver DATABASE_URL definida (arriba).
+      - name: Generate Prisma client
+        run: npm run generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Los tests son de dominio puro (Recommendation, reglas, categorizador,
+      # simulador de metricas) - no tocan Postgres/Mongo/Redis, no hace falta
+      # levantar servicios en el runner.
+      - name: Test
+        run: npm run test
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      VITE_API_BASE_URL: http://localhost:4100
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # tsc -b + vite build: typecheck real y que el bundle de produccion
+      # efectivamente compile, no solo que pase --noEmit.
+      - name: Build
+        run: npm run build

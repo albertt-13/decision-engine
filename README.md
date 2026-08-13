@@ -207,15 +207,83 @@ para este volumen) que cada N minutos:
 2. Guarda un `SalesSnapshot` por producto
 3. El motor de reglas de `/recommendations` lee los últimos snapshots para decidir
 
-## Frontend (dashboard)
+## Frontend (`frontend/`)
 
-React + Vite + TypeScript + React Query, deploy en Vercel. Pantallas: login del operador,
-recomendaciones actuales (con `reason` visible — la auditabilidad tiene que ser visible, no solo
-existir en la base), historial de snapshots (gráfico simple de tendencia), y el toggle
-shadow/live con el estado del guardrail.
+Dashboard del operador — proyecto aparte dentro del mismo repo (no un servicio más del backend,
+es un cliente HTTP más de la API, igual que cualquier otro consumidor).
+
+| | |
+|---|---|
+| **Stack** | React 19 + Vite + TypeScript, Tailwind CSS 4, TanStack Query (fetching/cache), React Router, Recharts, Axios |
+| **Puerto (dev)** | 5173 |
+| **Se comunica por** | HTTPS contra `decision-engine` (`VITE_API_BASE_URL`), con el JWT del operador en cada request |
+
+```
+frontend/src/
+├── api/            # client.ts (axios + interceptor de auth), auth.ts, recommendations.ts, types.ts
+├── auth/           # AuthContext — guarda el JWT en localStorage, expone useAuth()
+├── components/     # Navbar, ProtectedRoute (redirige a /login si no hay sesión), ModeBadge
+├── pages/          # LoginPage, RecommendationsPage, SnapshotsPage
+├── App.tsx         # rutas
+└── main.tsx        # providers: QueryClientProvider, BrowserRouter, AuthProvider
+```
+
+**Pantallas:**
+- **Login** (`/login`) — el operador único (ver credenciales abajo).
+- **Recomendaciones** (`/recommendations`) — botón "Generar recomendaciones" (dispara
+  `POST /recommendations`), toggle de modo shadow/live, lista de recomendaciones con el `reason`
+  siempre visible (la auditabilidad tiene que verse en la UI, no solo existir en la base) y un
+  badge de modo por cada una.
+- **Tendencia de ventas** (`/snapshots`) — gráfico de línea (Recharts) + tabla de
+  `SalesSnapshot`, un color por producto.
+
+Auth: `ProtectedRoute` envuelve las rutas privadas y redirige a `/login` si no hay JWT guardado;
+el token se adjunta automáticamente vía interceptor de Axios en cada request.
+
+## Cómo correrlo todo en local
+
+Tres piezas: infraestructura (Docker), backend, frontend — cada una en su propia terminal.
+
+**1. Infraestructura** (Postgres + Mongo + Redis):
+```bash
+cd C:\dev\decision-engine
+docker compose up -d postgres mongo redis
+```
+
+**2. Backend:**
+```bash
+cd C:\dev\decision-engine
+npm install                  # primera vez
+npx prisma migrate dev       # primera vez, crea las tablas
+npm run dev                  # tsx watch, puerto 4100
+```
+
+**3. Frontend** (en otra terminal):
+```bash
+cd C:\dev\decision-engine\frontend
+npm install                  # primera vez
+npm run dev                  # Vite, puerto 5173
+```
+
+Abrir **http://localhost:5173**.
+
+### Login de prueba
+
+| Campo | Valor |
+|---|---|
+| Email | `operador@decision-engine.local` |
+| Password | `operador123` |
+
+Definidos en `.env` (raíz del proyecto, gitignorado) como `OPERATOR_EMAIL` +
+`OPERATOR_PASSWORD_HASH` (hash bcrypt de esa password — nunca se guarda en texto plano, ni
+siquiera en un `.env` local). Para generar un hash nuevo:
+```bash
+node -e "console.log(require('bcrypt').hashSync('tu-password', 12))"
+```
 
 ## Roadmap
 
 Ver `C:\dev\Proyecto\Sr-Backend-Roadmap\07 - Mutación - Roadmap y Checklist.md` en el vault de
-Obsidian para el checklist accionable, fase por fase. Nada de este proyecto está implementado
-todavía — esta es la definición de arquitectura antes de escribir código.
+Obsidian para el checklist accionable. Estado real: **backend (M0-M3) y frontend base (M4)
+completos y verificados en vivo contra OrderFlow en producción** — falta pulir estilo del
+frontend y la preparación de entrevista sobre el gap de .NET.

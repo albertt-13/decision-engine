@@ -8,6 +8,8 @@ import { MongoSalesSnapshotRepository } from "./adapters/outbound/mongo/MongoSal
 import { MongoProductProfileRepository } from "./adapters/outbound/mongo/MongoProductProfileRepository.js";
 import { RedisRateLimiter } from "./adapters/outbound/redis/RedisRateLimiter.js";
 import { AnthropicLLMClient } from "./adapters/outbound/anthropic/AnthropicLLMClient.js";
+import { GroqLLMClient } from "./adapters/outbound/groq/GroqLLMClient.js";
+import type { LLMClient } from "./ports/LLMClient.js";
 import { GenerateRecommendation } from "./application/GenerateRecommendation.js";
 import { ToggleExecutionMode } from "./application/ToggleExecutionMode.js";
 import { RunAggregationPipeline } from "./application/RunAggregationPipeline.js";
@@ -40,7 +42,10 @@ const snapshotRepo = new MongoSalesSnapshotRepository();
 const productProfileRepo = new MongoProductProfileRepository();
 const rateLimiter = new RedisRateLimiter();
 const insightRepo = new PrismaInsightRepository();
-const llmClient = new AnthropicLLMClient();
+// Selección de adapter por env var — la prueba de que el puerto LLMClient
+// realmente aísla al dominio del proveedor: cambiar de Anthropic a Groq es
+// esto, nada más, en ningún otro archivo.
+const llmClient: LLMClient = env.LLM_PROVIDER === "groq" ? new GroqLLMClient() : new AnthropicLLMClient();
 
 const listRecommendations = new ListRecommendations(recommendationRepo);
 const getSalesSnapshots = new GetSalesSnapshots(snapshotRepo);

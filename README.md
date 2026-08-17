@@ -301,10 +301,16 @@ interface LLMClient {
 }
 ```
 
-`LLMClient` es un puerto — el dominio/aplicación no importa el SDK de Anthropic en ningún lado,
-solo estos tipos. `AnthropicLLMClient` (`adapters/outbound/anthropic/`) es el único adapter hoy,
-igual que `OrderFlowDataSource` es el único adapter de `DataSource`: si mañana hiciera falta
-cambiar de proveedor, es un adapter nuevo, no tocar `AiOrchestrator`.
+`LLMClient` es un puerto — el dominio/aplicación no importa el SDK de ningún proveedor en ningún
+lado, solo estos tipos. Hay **dos adapters reales** (no uno + un mock): `AnthropicLLMClient`
+(`adapters/outbound/anthropic/`, el proveedor documentado) y `GroqLLMClient`
+(`adapters/outbound/groq/`, tier gratis, formato de tool-calling estilo OpenAI). Se elige con
+`LLM_PROVIDER` en `.env` — cambiar de proveedor es esa variable, nada más, en ningún otro archivo.
+No es un ejercicio teórico: se agregó justamente para poder probar el flujo completo sin gastar
+crédito pago, y de paso prueba en la práctica que el puerto efectivamente aísla al dominio del
+proveedor. Los dos wire formats son bien distintos (Anthropic anida `tool_use`/`tool_result` como
+bloques de un mismo mensaje; Groq/OpenAI usa mensajes `role: "tool"` separados) — esa traducción
+vive enteramente en cada adapter.
 
 **Por qué un solo proveedor (Claude) y no el router dual OpenAI+Claude de la propuesta original:**
 para un MVP, duplicar credenciales/costos/superficie de testing no aporta nada demostrable extra
@@ -400,9 +406,10 @@ npx prisma migrate dev       # primera vez, crea las tablas
 npm run dev                  # tsx watch, puerto 4100
 ```
 
-> El AI Analyst (M5) necesita `ANTHROPIC_API_KEY` en `.env` (sacala en console.anthropic.com →
-> API Keys, con saldo cargado). Sin eso, el resto del backend funciona igual — solo
-> `POST /ai/ask` y el Insight Engine fallan.
+> El AI Analyst (M5) necesita `LLM_PROVIDER` + la API key correspondiente en `.env`: `anthropic`
+> (console.anthropic.com → API Keys, con saldo cargado) o `groq` (console.groq.com/keys, tier
+> gratis, sin tarjeta). Sin eso, el resto del backend funciona igual — solo `POST /ai/ask` y el
+> Insight Engine fallan.
 
 **3. Frontend** (en otra terminal):
 ```bash

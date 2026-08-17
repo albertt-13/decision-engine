@@ -15,6 +15,8 @@ import { authRouter } from "./adapters/inbound/http/auth/auth.routes.js";
 import { recommendationsRouter } from "./adapters/inbound/http/recommendations/recommendations.routes.js";
 import { reportsRouter } from "./adapters/inbound/http/reports/reports.routes.js";
 import { catalogRouter } from "./adapters/inbound/http/catalog/catalog.routes.js";
+import { aiRouter } from "./adapters/inbound/http/ai/ai.routes.js";
+import { insightsRouter } from "./adapters/inbound/http/insights/insights.routes.js";
 
 export const app = express();
 
@@ -53,5 +55,7 @@ app.use("/auth", authRouter);
 app.use("/recommendations", recommendationsRouter);
 app.use("/reports", reportsRouter);
 app.use("/catalog", catalogRouter);
+app.use("/ai", aiRouter);
+app.use("/insights", insightsRouter);
 
 app.use(errorHandler);

@@ -5,6 +5,7 @@ import { prisma } from "./adapters/outbound/postgres/prisma.js";
 import { connectMongo, mongoClient } from "./adapters/outbound/mongo/mongo.js";
 import { redis } from "./adapters/outbound/redis/redis.js";
 import { startAggregationCron, stopAggregationCron } from "./adapters/inbound/cron/aggregationCron.js";
+import { startInsightsCron, stopInsightsCron } from "./adapters/inbound/cron/insightsCron.js";
 
 async function main() {
   await connectMongo();
@@ -14,10 +15,12 @@ async function main() {
   });
 
   startAggregationCron();
+  startInsightsCron();
 
   process.on("SIGTERM", () => {
     logger.info("SIGTERM recibido: dejando de aceptar requests nuevas...");
     stopAggregationCron();
+    stopInsightsCron();
     server.close(() => {
       logger.info("server HTTP cerrado, cerrando conexiones...");
       Promise.allSettled([prisma.$disconnect(), mongoClient.close(), redis.quit()]).then(() => {

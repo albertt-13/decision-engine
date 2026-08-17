@@ -17,6 +17,7 @@ jobs:
       OPERATOR_EMAIL: operador@decision-engine.local
       OPERATOR_PASSWORD_HASH: $2b$12$5jRW3iO4zDognAvYuhqZ/.KcrIdOM4QDekpkJTf89h43lrDqrDG4S
       ORDERFLOW_BASE_URL: https://orderflow-api-gateway-my23.onrender.com
+      ANTHROPIC_API_KEY: ci-fake-key
       LIVE_MODE_MAX_PER_HOUR: 20
       CORS_ORIGINS: http://localhost:5173
 

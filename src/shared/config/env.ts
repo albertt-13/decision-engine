@@ -11,7 +11,9 @@ const envSchema = z.object({
   OPERATOR_EMAIL: z.string().email(),
   OPERATOR_PASSWORD_HASH: z.string().min(1),
   ORDERFLOW_BASE_URL: z.string().url(),
+  ANTHROPIC_API_KEY: z.string().min(1),
   AGGREGATION_CRON_SCHEDULE: z.string().default("*/10 * * * *"),
+  INSIGHTS_CRON_SCHEDULE: z.string().default("0 6 * * *"),
   LIVE_MODE_MAX_PER_HOUR: z.coerce.number().int().positive().default(20),
   // Whitelist explícita, separada por comas — mismo criterio que api-gateway
   // de OrderFlow. Vacío por defecto: sin el dominio de Vercel del dashboard

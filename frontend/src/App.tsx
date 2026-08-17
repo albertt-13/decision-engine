@@ -3,6 +3,7 @@ import { LoginPage } from "./pages/LoginPage.js";
 import { RecommendationsPage } from "./pages/RecommendationsPage.js";
 import { SnapshotsPage } from "./pages/SnapshotsPage.js";
 import { CatalogPage } from "./pages/CatalogPage.js";
+import { AiAnalystPage } from "./pages/AiAnalystPage.js";
 import { ProtectedRoute } from "./components/ProtectedRoute.js";
 
 export function App() {
@@ -13,6 +14,7 @@ export function App() {
         <Route path="/recommendations" element={<RecommendationsPage />} />
         <Route path="/snapshots" element={<SnapshotsPage />} />
         <Route path="/catalog" element={<CatalogPage />} />
+        <Route path="/ai-analyst" element={<AiAnalystPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/recommendations" replace />} />
     </Routes>

@@ -51,3 +51,16 @@ export interface SyncCatalogResult {
   created: number;
   skipped: number;
 }
+
+export interface AskAiResult {
+  answer: string;
+  toolsUsed: string[];
+  cached: boolean;
+}
+
+export interface Insight {
+  id: string;
+  content: string;
+  generatedBy: string;
+  createdAt: string;
+}

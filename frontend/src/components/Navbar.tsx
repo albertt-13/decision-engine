@@ -26,6 +26,9 @@ export function Navbar() {
             <NavLink to="/snapshots" className={linkClasses}>
               Tendencia de ventas
             </NavLink>
+            <NavLink to="/ai-analyst" className={linkClasses}>
+              AI Analyst
+            </NavLink>
           </nav>
         </div>
         <button

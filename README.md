@@ -49,29 +49,35 @@ src/
 ├── domain/                 # reglas de negocio puras, cero imports de infraestructura
 │   ├── recommendation/     # entidad Recommendation + motor de reglas (2 reglas, ver abajo)
 │   ├── executionMode/      # lógica de shadow/live + guardrail
-│   └── catalog/             # ProductProfile, categorizador por keyword, simulador de métricas
+│   ├── catalog/             # ProductProfile, categorizador por keyword, simulador de métricas
+│   └── insights/             # Insight — dato de reporting generado por el AI Analyst
 ├── ports/                  # interfaces que el dominio define y la infra implementa
 │   ├── DataSource.ts
 │   ├── RecommendationRepository.ts
 │   ├── SystemConfigRepository.ts
 │   ├── SalesSnapshotRepository.ts
 │   ├── ProductProfileRepository.ts
+│   ├── InsightRepository.ts
+│   ├── LLMClient.ts
 │   └── RateLimiter.ts
 ├── application/             # casos de uso: orquestan dominio + puertos
 │   ├── GenerateRecommendation.ts
 │   ├── ToggleExecutionMode.ts
 │   ├── RunAggregationPipeline.ts
 │   ├── SyncProductCatalog.ts
-│   └── ListProductProfiles.ts
+│   ├── ListProductProfiles.ts
+│   ├── ListInsights.ts
+│   └── ai/                   # AiOrchestrator, aiTools (tool-calling), GenerateDailyInsights
 ├── adapters/
 │   ├── inbound/
 │   │   ├── http/            # Express: routes, controllers — llaman casos de uso
-│   │   └── cron/             # dispara RunAggregationPipeline periódicamente
+│   │   └── cron/             # dispara RunAggregationPipeline e insightsCron periódicamente
 │   └── outbound/
-│       ├── postgres/         # PrismaRecommendationRepository, PrismaSystemConfigRepository
+│       ├── postgres/         # PrismaRecommendationRepository, PrismaSystemConfigRepository, PrismaInsightRepository
 │       ├── mongo/             # MongoSalesSnapshotRepository, MongoProductProfileRepository
 │       ├── redis/             # RedisRateLimiter
-│       └── orderflow/         # OrderFlowDataSource
+│       ├── orderflow/         # OrderFlowDataSource
+│       └── anthropic/         # AnthropicLLMClient
 └── shared/                   # logger, config/env, errores — cross-cutting, sin lógica de negocio
 ```
 
@@ -135,6 +141,8 @@ en v1 porque no hace falta todavía.
 - Vitest — testing (el dominio, al ser puro, se testea sin mockear infraestructura)
 - Auth propia y simple para el dashboard: JWT de un único rol "operador" (no hay multi-tenant
   todavía, es una herramienta interna) — simplificación deliberada, documentada como tal.
+- **Anthropic API** (Claude, `fetch` directo — sin SDK, mismo criterio que `OrderFlowDataSource`)
+  — motor del AI Analyst (M5), ver sección dedicada abajo.
 
 ## Modelo de datos
 
@@ -238,6 +246,8 @@ categoría, no es una caja negra. Categorías hoy: `COM` (Cómputo), `PAN` (Pant
 | GET | `/reports/sales-snapshots` | operador | Serie histórica de `SalesSnapshot`, para el dashboard |
 | GET | `/catalog` | operador | Lista los `ProductProfile` (SKU, categoría, métricas de marketing) |
 | POST | `/catalog/sync` | operador | Trae el catálogo de OrderFlow y crea un perfil para cada producto nuevo — idempotente, no duplica ni pisa perfiles existentes |
+| POST | `/ai/ask` | operador | Pregunta en lenguaje natural al AI Analyst (ver sección dedicada) |
+| GET | `/insights` | operador | Últimos insights generados por el Insight Engine |
 | GET | `/health` | — | Health real: Postgres, Redis, Mongo |
 | GET | `/live` | — | Liveness puro, sin dependencias — lo que usa Render para decidir reinicios (ver mini-ADR de OrderFlow, mismo criterio aplicado desde el arranque acá) |
 
@@ -270,6 +280,68 @@ para este volumen) que cada N minutos:
 2. Guarda un `SalesSnapshot` por producto
 3. El motor de reglas de `/recommendations` lee los últimos snapshots para decidir
 
+## AI Analyst (M5)
+
+Nace de una propuesta de arquitectura de IA a escala real (SaaS multi-tenant, 100+ clientes,
+RabbitMQ, integraciones con Google Ads/GA4/Shopify/Meta, router dual OpenAI+Claude, RAG sobre
+Obsidian) que le compartieron a Alber para el rol de Data4Sales. Se decidió explícitamente **no**
+construir esa versión — es scope de un equipo completo — sino una versión MVP del mismo patrón,
+sobre lo que este proyecto ya tenía: motor de reglas, Postgres/Mongo, Redis, cron. Decisiones de
+alcance completas en `09 - Mutación - AI Analyst (MVP).md` del vault.
+
+**Regla dura, tomada directo de la propuesta original: el LLM nunca ve datos crudos.** Solo puede
+invocar *tools* (`application/ai/aiTools.ts`) que envuelven casos de uso ya existentes
+(`ListRecommendations`, `GetSalesSnapshots`, `ListProductProfiles`) y devuelven **agregados**
+(totales, top-N, promedios) — nunca la colección completa. No importa cuántas veces el modelo
+llame a una tool, estructuralmente no tiene forma de terminar viendo la base entera.
+
+```typescript
+interface LLMClient {
+  send(params: { system: string; messages: LLMMessage[]; tools: LLMTool[] }): Promise<LLMResponse>;
+}
+```
+
+`LLMClient` es un puerto — el dominio/aplicación no importa el SDK de Anthropic en ningún lado,
+solo estos tipos. `AnthropicLLMClient` (`adapters/outbound/anthropic/`) es el único adapter hoy,
+igual que `OrderFlowDataSource` es el único adapter de `DataSource`: si mañana hiciera falta
+cambiar de proveedor, es un adapter nuevo, no tocar `AiOrchestrator`.
+
+**Por qué un solo proveedor (Claude) y no el router dual OpenAI+Claude de la propuesta original:**
+para un MVP, duplicar credenciales/costos/superficie de testing no aporta nada demostrable extra
+— el patrón de tool-calling se prueba igual con un proveedor. El router quedaría documentado como
+"cómo escalaría esto", no como código.
+
+**`AiOrchestrator`** (`application/ai/AiOrchestrator.ts`) corre el loop de tool-use: le manda la
+pregunta + las tools al LLM, si pide ejecutar una la corre y le devuelve el resultado, hasta que
+contesta con texto final (tope de 5 turnos para no quedar en loop infinito). El contexto de
+negocio fijo que se inyecta en el prompt vive en `docs/business-context.md` — texto plano
+versionado en el repo, el reemplazo MVP del "Business Knowledge Base" (Obsidian + RAG) de la
+propuesta original: sin vector DB, sin embeddings, porque sería sobre-ingeniería para el tamaño
+real de este proyecto.
+
+**Insight Engine** (`insightsCron.ts`, `GenerateDailyInsights`): corre periódicamente (por defecto
+una vez al día, `INSIGHTS_CRON_SCHEDULE`), le pide al AI Analyst 2-3 insights de negocio sobre los
+datos agregados, y los persiste en Postgres (`Insight` — necesita integridad/auditoría, igual
+motivo que `Recommendation`). El chat no tiene que volver a analizar todo desde cero cada vez que
+alguien pregunta "¿qué oportunidades tengo?" — ya están calculados.
+
+**Cache de respuestas en Redis**: `POST /ai/ask` cachea por pregunta normalizada (hash SHA-256,
+TTL 5 min) — evita pagarle al LLM dos veces la misma pregunta. Si Redis está degradado, el
+endpoint sigue funcionando sin cache (mismo criterio fail-safe que el guardrail de
+recomendaciones).
+
+**Endpoints:**
+| Método | Ruta | Auth | Qué hace |
+|---|---|---|---|
+| POST | `/ai/ask` | operador | Pregunta en lenguaje natural → `AiOrchestrator` → respuesta + qué tools usó |
+| GET | `/insights` | operador | Últimos insights generados por el Insight Engine |
+
+**Cómo escalaría esto al diseño completo de la propuesta original** (no implementado, preparación
+de entrevista): multi-tenant (`tenant_id` en cada tabla, nunca elegido por el modelo), RabbitMQ
+para las N integraciones externas por cliente en vez de un solo cron, router dual de modelos
+(rápido/barato para conversación, razonamiento largo para análisis), y RAG real sobre una base de
+conocimiento de negocio por cliente en vez de un markdown fijo.
+
 ## Frontend (`frontend/`)
 
 Dashboard del operador — proyecto aparte dentro del mismo repo (no un servicio más del backend,
@@ -283,10 +355,10 @@ es un cliente HTTP más de la API, igual que cualquier otro consumidor).
 
 ```
 frontend/src/
-├── api/            # client.ts (axios + interceptor de auth), auth.ts, recommendations.ts, types.ts
-├── auth/           # AuthContext — guarda el JWT en localStorage, expone useAuth()
+├── api/            # client.ts (axios + interceptor de auth), auth.ts, recommendations.ts, catalog.ts, ai.ts, types.ts
+├── auth/           # AuthContext (AuthProvider) + useAuth() en su propio archivo (fast refresh)
 ├── components/     # Navbar, ProtectedRoute (redirige a /login si no hay sesión), ModeBadge
-├── pages/          # LoginPage, RecommendationsPage, SnapshotsPage
+├── pages/          # LoginPage, RecommendationsPage, SnapshotsPage, CatalogPage, AiAnalystPage
 ├── App.tsx         # rutas
 └── main.tsx        # providers: QueryClientProvider, BrowserRouter, AuthProvider
 ```
@@ -303,6 +375,9 @@ frontend/src/
   código. Botón "Sincronizar catálogo" dispara `POST /catalog/sync`.
 - **Tendencia de ventas** (`/snapshots`) — gráfico de línea (Recharts) + tabla de
   `SalesSnapshot`, un color por producto.
+- **AI Analyst** (`/ai-analyst`) — chat simple contra `POST /ai/ask` (muestra qué tools usó el
+  modelo para responder y si la respuesta vino de cache) + panel de últimos insights generados
+  por el Insight Engine (`GET /insights`).
 
 Auth: `ProtectedRoute` envuelve las rutas privadas y redirige a `/login` si no hay JWT guardado;
 el token se adjunta automáticamente vía interceptor de Axios en cada request.
@@ -324,6 +399,10 @@ npm install                  # primera vez
 npx prisma migrate dev       # primera vez, crea las tablas
 npm run dev                  # tsx watch, puerto 4100
 ```
+
+> El AI Analyst (M5) necesita `ANTHROPIC_API_KEY` en `.env` (sacala en console.anthropic.com →
+> API Keys, con saldo cargado). Sin eso, el resto del backend funciona igual — solo
+> `POST /ai/ask` y el Insight Engine fallan.
 
 **3. Frontend** (en otra terminal):
 ```bash
@@ -351,6 +430,7 @@ node -e "console.log(require('bcrypt').hashSync('tu-password', 12))"
 ## Roadmap
 
 Ver `C:\dev\Proyecto\Sr-Backend-Roadmap\07 - Mutación - Roadmap y Checklist.md` en el vault de
-Obsidian para el checklist accionable. Estado real: **backend (M0-M3) y frontend base (M4)
-completos y verificados en vivo contra OrderFlow en producción** — falta pulir estilo del
-frontend y la preparación de entrevista sobre el gap de .NET.
+Obsidian para el checklist accionable. Estado real: **backend (M0-M3), catálogo enriquecido
+(M1.5), frontend base (M4) y AI Analyst MVP (M5) completos**, CI/CD en GitHub Actions verde,
+verificados en vivo contra OrderFlow en producción — falta pulir estilo del frontend, deploy a
+producción, y la preparación de entrevista sobre el gap de .NET.

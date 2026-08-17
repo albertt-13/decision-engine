@@ -46,6 +46,7 @@ const insightRepo = new PrismaInsightRepository();
 // realmente aísla al dominio del proveedor: cambiar de Anthropic a Groq es
 // esto, nada más, en ningún otro archivo.
 const llmClient: LLMClient = env.LLM_PROVIDER === "groq" ? new GroqLLMClient() : new AnthropicLLMClient();
+const llmProviderLabel = env.LLM_PROVIDER === "groq" ? "groq/openai-gpt-oss-20b" : "anthropic/claude-sonnet-5";
 
 const listRecommendations = new ListRecommendations(recommendationRepo);
 const getSalesSnapshots = new GetSalesSnapshots(snapshotRepo);
@@ -69,6 +70,6 @@ export const useCases = {
   syncProductCatalog: new SyncProductCatalog(dataSource, productProfileRepo),
   listProductProfiles,
   aiOrchestrator,
-  generateDailyInsights: new GenerateDailyInsights(aiOrchestrator, insightRepo),
+  generateDailyInsights: new GenerateDailyInsights(aiOrchestrator, insightRepo, llmProviderLabel),
   listInsights: new ListInsights(insightRepo),
 };

@@ -2,7 +2,7 @@ import type { LLMClient, LLMContentBlock, LLMMessage, LLMResponse, LLMTool } fro
 import { env } from "../../../shared/config/env.js";
 
 const API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "openai/gpt-oss-20b";
 const MAX_TOKENS = 1024;
 const TIMEOUT_MS = 20000;
 

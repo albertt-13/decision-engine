@@ -2,8 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { InsightRepository } from "../../ports/InsightRepository.js";
 import type { AiOrchestrator } from "./AiOrchestrator.js";
 
-const GENERATED_BY = "claude-sonnet-5";
-
 const PROMPT = [
   "Basándote en los datos agregados disponibles (recomendaciones, ventas, catálogo), generá entre",
   "2 y 3 insights de negocio concretos y accionables, en español. Un insight por línea, cada línea",
@@ -21,6 +19,8 @@ export class GenerateDailyInsights {
   constructor(
     private readonly orchestrator: AiOrchestrator,
     private readonly insightRepo: InsightRepository,
+    /** Qué adapter/modelo generó esto — lo decide la composition root, no este caso de uso. */
+    private readonly generatedBy: string,
   ) {}
 
   async execute(): Promise<number> {
@@ -31,7 +31,7 @@ export class GenerateDailyInsights {
       .filter(Boolean);
 
     for (const content of lines) {
-      await this.insightRepo.save({ id: randomUUID(), content, generatedBy: GENERATED_BY, createdAt: new Date() });
+      await this.insightRepo.save({ id: randomUUID(), content, generatedBy: this.generatedBy, createdAt: new Date() });
     }
 
     return lines.length;

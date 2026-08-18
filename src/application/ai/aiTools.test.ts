@@ -73,6 +73,12 @@ function buildTools() {
         avgDecisionTimeSeconds: 60,
         peakPurchaseHour: 18,
       },
+      channels: {
+        googleAds: { impressions: 4000, clicks: 200, ctr: 0.05, cpc: 100, spend: 20000, conversions: 8, roas: 4 },
+        ga4: { organicSessions: 100, paidSessions: 100, bounceRate: 0.4, avgSessionDurationSeconds: 90 },
+        searchConsole: { searchImpressions: 3000, searchClicks: 80, avgPosition: 5.5 },
+        metaAds: { reach: 1500, impressions: 2000, clicks: 60, ctr: 0.03, spend: 6000, conversions: 3 },
+      },
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -121,5 +127,22 @@ describe("aiTools", () => {
 
     expect(result.totalProducts).toBe(1);
     expect(result.avgCartAbandonmentRate).toBe(0.8);
+  });
+
+  it("get_channel_performance_summary agrega spend y conversiones por canal, no expone el detalle crudo", async () => {
+    const tools = buildTools();
+    const tool = tools.find((t) => t.definition.name === "get_channel_performance_summary")!;
+
+    const result = (await tool.execute({})) as {
+      googleAds: { totalSpend: number; totalConversions: number; blendedRoas: number };
+      metaAds: { totalSpend: number };
+      topByGoogleAdsRoas: { sku: string }[];
+    };
+
+    expect(result.googleAds.totalSpend).toBe(20000);
+    expect(result.googleAds.totalConversions).toBe(8);
+    expect(result.googleAds.blendedRoas).toBe(0.4); // 8 conversiones * $1000 / $20000 spend
+    expect(result.metaAds.totalSpend).toBe(6000);
+    expect(result.topByGoogleAdsRoas[0]?.sku).toBe("AUD-AUR-0001");
   });
 });

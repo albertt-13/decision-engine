@@ -27,6 +27,12 @@ function buildProfile(overrides: Partial<ProductProfile> & { orderFlowProductId:
       avgDecisionTimeSeconds: 0,
       peakPurchaseHour: 0,
     },
+    channels: {
+      googleAds: { impressions: 0, clicks: 0, ctr: 0, cpc: 0, spend: 0, conversions: 0, roas: 0 },
+      ga4: { organicSessions: 0, paidSessions: 0, bounceRate: 0, avgSessionDurationSeconds: 0 },
+      searchConsole: { searchImpressions: 0, searchClicks: 0, avgPosition: 0 },
+      metaAds: { reach: 0, impressions: 0, clicks: 0, ctr: 0, spend: 0, conversions: 0 },
+    },
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

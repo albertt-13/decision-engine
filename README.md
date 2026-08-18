@@ -225,6 +225,18 @@ interface ProductProfileDocument {
 > probar el motor de reglas que sí los consume, sin depender de tener tráfico real. Queda
 > visible en el dashboard, no escondido.
 
+**Métricas por canal — también simuladas, mismo criterio.** Cada producto además tiene
+`channels: { googleAds, ga4, searchConsole, metaAds }` — el shape de datos que esas 4 plataformas
+devolverían (impresiones, clicks, CTR, spend, conversiones, ROAS, sesiones, posición de búsqueda),
+generado por `simulateChannelMetrics()` (`domain/catalog/ChannelMetricsSimulator.ts`) a partir del
+mismo `marketing` funnel y del precio real del producto — no son 4 generadores random
+independientes: `ga4.organicSessions + ga4.paidSessions === marketing.viewCount`,
+`googleAds.clicks + metaAds.clicks === ga4.paidSessions`, `metaAds.reach <= metaAds.impressions`,
+y el ROAS de Google Ads sale de `conversiones × precio real / spend`. El CPC se calcula como % del
+precio del producto (no un monto fijo), para que el ROAS resultante quede en un rango creíble
+(la mayoría entre 1.5 y 8, no todo rentable ni todo en pérdida). Shopify no se simula: ya está
+cubierto por los datos reales de OrderFlow.
+
 **Nomenclatura de SKU — `CAT-SUB-####`:** categoría (3 letras) + subcategoría (3 letras) +
 secuencia (4 dígitos, con padding). Ej.: `AUD-AUR-0001` = Audio → Auriculares → primer producto
 de esa subcategoría. La categorización es por reglas de keyword sobre el nombre del producto
@@ -290,10 +302,16 @@ sobre lo que este proyecto ya tenía: motor de reglas, Postgres/Mongo, Redis, cr
 alcance completas en `09 - Mutación - AI Analyst (MVP).md` del vault.
 
 **Regla dura, tomada directo de la propuesta original: el LLM nunca ve datos crudos.** Solo puede
-invocar *tools* (`application/ai/aiTools.ts`) que envuelven casos de uso ya existentes
-(`ListRecommendations`, `GetSalesSnapshots`, `ListProductProfiles`) y devuelven **agregados**
-(totales, top-N, promedios) — nunca la colección completa. No importa cuántas veces el modelo
-llame a una tool, estructuralmente no tiene forma de terminar viendo la base entera.
+invocar *tools* (`application/ai/aiTools.ts`) que envuelven casos de uso ya existentes y devuelven
+**agregados** (totales, top-N, promedios) — nunca la colección completa. No importa cuántas veces
+el modelo llame a una tool, estructuralmente no tiene forma de terminar viendo la base entera:
+
+| Tool | Envuelve | Devuelve |
+|---|---|---|
+| `get_recommendations_summary` | `ListRecommendations` | total, desglose por modo, últimas 5 |
+| `get_sales_snapshots_summary` | `GetSalesSnapshots` | unidades totales, top 5 productos |
+| `get_catalog_summary` | `ListProductProfiles` | total, abandono promedio, top 5 en abandono |
+| `get_channel_performance_summary` | `ListProductProfiles` (`channels`) | spend/clicks/conversiones agregados por canal (Google Ads, Meta Ads, GA4, Search Console), top 3 por ROAS |
 
 ```typescript
 interface LLMClient {

@@ -18,6 +18,8 @@ sistema — por eso todo pasa primero por modo SHADOW antes de ejecutarse en LIV
 
 - Unidades vendidas por producto (dato real, de OrderFlow)
 - Tasa de abandono de carrito (dato **simulado** — ver catálogo)
+- ROAS, CTR y CPC por canal — Google Ads, Meta Ads (dato **simulado**), sesiones y SEO — GA4,
+  Search Console (dato **simulado**)
 - Cantidad de recomendaciones generadas y ejecutadas por modo (SHADOW vs LIVE)
 
 ## Constraints
@@ -28,3 +30,6 @@ sistema — por eso todo pasa primero por modo SHADOW antes de ejecutarse en LIV
   OrderFlow solo trackea pedidos confirmados, no comportamiento de navegación. Cualquier insight
   basado en esas métricas debe tratarse como una demostración del patrón, no como un dato real de
   negocio.
+- Las métricas por canal (Google Ads, GA4, Search Console, Meta Ads) también son **simuladas** —
+  no hay integración real con esas plataformas — pero se derivan matemáticamente del mismo funnel
+  simulado (vistas, compras, precio real), no son números independientes al azar.

@@ -32,7 +32,9 @@ export function CatalogPage() {
             marketing.{" "}
             <span className="text-amber-400">
               Las métricas de comportamiento (vistas, carrito, tiempos) son simuladas — OrderFlow solo
-              trackea pedidos confirmados, no navegación ni carrito.
+              trackea pedidos confirmados, no navegación ni carrito. Cada producto también tiene métricas
+              simuladas de Google Ads, GA4, Search Console y Meta Ads (preguntale al AI Analyst por ROAS,
+              spend o sesiones por canal).
             </span>
           </p>
         </div>

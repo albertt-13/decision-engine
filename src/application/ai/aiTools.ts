@@ -68,6 +68,58 @@ export function buildAiTools(deps: AiToolDeps): AiTool[] {
     },
     {
       definition: {
+        name: "get_channel_performance_summary",
+        description:
+          "Resumen agregado de performance por canal de marketing: Google Ads, Meta Ads, GA4 y " +
+          "Search Console (spend, clicks, conversiones, ROAS según corresponda) sumado sobre todo " +
+          "el catálogo, más el top 3 de productos con mejor ROAS en Google Ads. Estas métricas son " +
+          "simuladas (no hay integración real con esas plataformas), derivadas del mismo funnel " +
+          "que las métricas de marketing del catálogo. No devuelve el detalle por producto.",
+        inputSchema: EMPTY_OBJECT_SCHEMA,
+      },
+      async execute() {
+        const profiles = await deps.listProductProfiles.execute();
+        if (profiles.length === 0) {
+          return { totalProducts: 0 };
+        }
+
+        const sum = (values: number[]) => values.reduce((a, b) => a + b, 0);
+        const googleSpend = sum(profiles.map((p) => p.channels.googleAds.spend));
+        const googleRevenue = sum(profiles.map((p) => p.channels.googleAds.conversions * Number(p.price)));
+
+        const topByGoogleRoas = [...profiles]
+          .sort((a, b) => b.channels.googleAds.roas - a.channels.googleAds.roas)
+          .slice(0, 3)
+          .map((p) => ({ sku: p.sku, name: p.name, roas: p.channels.googleAds.roas }));
+
+        return {
+          googleAds: {
+            totalSpend: googleSpend,
+            totalClicks: sum(profiles.map((p) => p.channels.googleAds.clicks)),
+            totalConversions: sum(profiles.map((p) => p.channels.googleAds.conversions)),
+            blendedRoas: googleSpend > 0 ? Math.round((googleRevenue / googleSpend) * 100) / 100 : 0,
+          },
+          metaAds: {
+            totalSpend: sum(profiles.map((p) => p.channels.metaAds.spend)),
+            totalClicks: sum(profiles.map((p) => p.channels.metaAds.clicks)),
+            totalConversions: sum(profiles.map((p) => p.channels.metaAds.conversions)),
+          },
+          ga4: {
+            totalOrganicSessions: sum(profiles.map((p) => p.channels.ga4.organicSessions)),
+            totalPaidSessions: sum(profiles.map((p) => p.channels.ga4.paidSessions)),
+            avgBounceRate: sum(profiles.map((p) => p.channels.ga4.bounceRate)) / profiles.length,
+          },
+          searchConsole: {
+            totalSearchClicks: sum(profiles.map((p) => p.channels.searchConsole.searchClicks)),
+            totalSearchImpressions: sum(profiles.map((p) => p.channels.searchConsole.searchImpressions)),
+            avgPosition: sum(profiles.map((p) => p.channels.searchConsole.avgPosition)) / profiles.length,
+          },
+          topByGoogleAdsRoas: topByGoogleRoas,
+        };
+      },
+    },
+    {
+      definition: {
         name: "get_catalog_summary",
         description:
           "Resumen del catálogo de productos: cantidad total, promedio de tasa de abandono de " +

@@ -4,6 +4,7 @@ import type { ProductProfileRepository } from "../ports/ProductProfileRepository
 import type { ProductProfile } from "../domain/catalog/ProductProfile.js";
 import { categorizeProduct, buildSku } from "../domain/catalog/ProductCategorizer.js";
 import { simulateMarketingMetrics } from "../domain/catalog/MarketingMetricsSimulator.js";
+import { simulateChannelMetrics } from "../domain/catalog/ChannelMetricsSimulator.js";
 
 /**
  * Trae el catálogo completo de OrderFlow y crea un `ProductProfile` para
@@ -35,6 +36,7 @@ export class SyncProductCatalog {
       const { category, subcategory } = categorizeProduct(product.name);
       const sequence = (await this.profileRepo.countBySubcategory(subcategory.code)) + 1;
       const now = new Date();
+      const marketing = simulateMarketingMetrics(this.random);
 
       const profile: ProductProfile = {
         id: randomUUID(),
@@ -44,7 +46,8 @@ export class SyncProductCatalog {
         price: product.price,
         category,
         subcategory,
-        marketing: simulateMarketingMetrics(this.random),
+        marketing,
+        channels: simulateChannelMetrics({ marketing, price: product.price, random: this.random }),
         createdAt: now,
         updatedAt: now,
       };

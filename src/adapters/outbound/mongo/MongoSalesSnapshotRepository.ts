@@ -19,6 +19,10 @@ export class MongoSalesSnapshotRepository implements SalesSnapshotRepository {
     await getSalesSnapshotsCollection().insertMany(docs);
   }
 
+  async deleteAllSimulated(): Promise<void> {
+    await getSalesSnapshotsCollection().deleteMany({ source: "simulated" });
+  }
+
   async listRecent(limit: number): Promise<SalesSnapshot[]> {
     const docs = await getSalesSnapshotsCollection()
       .find()

@@ -52,6 +52,7 @@ function buildTools() {
   const snapshotRepo: SalesSnapshotRepository = {
     saveMany: notImplemented,
     listRecent: async () => snapshots,
+    deleteAllSimulated: notImplemented,
   };
 
   const profiles: ProductProfile[] = [

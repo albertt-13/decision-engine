@@ -20,6 +20,12 @@ export class BackfillSalesTrend {
   ) {}
 
   async execute(): Promise<number> {
+    // Idempotente: sin este borrado, correr "Generar historial" más de una vez
+    // apila una serie de 30 días nueva encima de la anterior (con otro seed
+    // random y otro instante de referencia) — el gráfico termina zigzagueando
+    // entre corridas en vez de mostrar una sola tendencia limpia.
+    await this.snapshotRepo.deleteAllSimulated();
+
     const bestsellers = await this.dataSource.getBestsellers(BESTSELLERS_LIMIT);
 
     const snapshots = bestsellers

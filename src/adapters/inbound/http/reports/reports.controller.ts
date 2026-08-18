@@ -7,4 +7,9 @@ export const reportsController = {
     const snapshots = await useCases.getSalesSnapshots.execute(limit);
     res.status(200).json(snapshots);
   },
+
+  async backfillSalesTrend(_req: Request, res: Response) {
+    const count = await useCases.backfillSalesTrend.execute();
+    res.status(200).json({ snapshotsCreated: count });
+  },
 };

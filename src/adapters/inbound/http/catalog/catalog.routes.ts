@@ -6,3 +6,4 @@ export const catalogRouter = Router();
 
 catalogRouter.get("/", requireAuth, catalogController.list);
 catalogRouter.post("/sync", requireAuth, catalogController.sync);
+catalogRouter.post("/seed-demo-brands", requireAuth, catalogController.seedDemoBrands);

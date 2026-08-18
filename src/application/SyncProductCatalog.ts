@@ -42,6 +42,7 @@ export class SyncProductCatalog {
         id: randomUUID(),
         sku: buildSku(category, subcategory, sequence),
         orderFlowProductId: product.id,
+        brand: "OrderFlow",
         name: product.name,
         price: product.price,
         category,

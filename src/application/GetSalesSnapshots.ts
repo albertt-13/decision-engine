@@ -1,7 +1,7 @@
 import type { SalesSnapshotRepository } from "../ports/SalesSnapshotRepository.js";
 import type { SalesSnapshot } from "../domain/reporting/SalesSnapshot.js";
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 150; // suficiente para cubrir los 30 días de historial (real + backfill simulado)
 
 export class GetSalesSnapshots {
   constructor(private readonly snapshotRepo: SalesSnapshotRepository) {}

@@ -13,6 +13,7 @@ function buildProfile(overrides: Partial<ProductProfile> & { orderFlowProductId:
   return {
     id: `profile-${overrides.orderFlowProductId}`,
     sku: "GEN-PRO-0001",
+    brand: "OrderFlow",
     name: "Producto genérico",
     price: "10.00",
     category: { code: "GEN", name: "General" },

@@ -44,9 +44,9 @@ function buildTools() {
   };
 
   const snapshots: SalesSnapshot[] = [
-    { id: "s1", productId: "p1", productName: "Auriculares X", unitsSold: 10, capturedAt: new Date() },
-    { id: "s2", productId: "p1", productName: "Auriculares X", unitsSold: 5, capturedAt: new Date() },
-    { id: "s3", productId: "p2", productName: "Mouse Y", unitsSold: 3, capturedAt: new Date() },
+    { id: "s1", productId: "p1", productName: "Auriculares X", unitsSold: 10, capturedAt: new Date(), source: "real" },
+    { id: "s2", productId: "p1", productName: "Auriculares X", unitsSold: 5, capturedAt: new Date(), source: "real" },
+    { id: "s3", productId: "p2", productName: "Mouse Y", unitsSold: 3, capturedAt: new Date(), source: "real" },
   ];
 
   const snapshotRepo: SalesSnapshotRepository = {
@@ -59,6 +59,7 @@ function buildTools() {
       id: "prof-1",
       sku: "AUD-AUR-0001",
       orderFlowProductId: "p1",
+      brand: "OrderFlow",
       name: "Auriculares X",
       price: "1000",
       category: { code: "AUD", name: "Audio" },

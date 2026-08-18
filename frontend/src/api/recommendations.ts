@@ -27,3 +27,8 @@ export async function getSalesSnapshots(): Promise<SalesSnapshot[]> {
   const { data } = await apiClient.get<SalesSnapshot[]>("/reports/sales-snapshots");
   return data;
 }
+
+export async function backfillSalesTrend(): Promise<{ snapshotsCreated: number }> {
+  const { data } = await apiClient.post<{ snapshotsCreated: number }>("/reports/sales-snapshots/backfill");
+  return data;
+}

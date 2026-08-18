@@ -18,6 +18,8 @@ import { GetSalesSnapshots } from "./application/GetSalesSnapshots.js";
 import { SyncProductCatalog } from "./application/SyncProductCatalog.js";
 import { ListProductProfiles } from "./application/ListProductProfiles.js";
 import { ListInsights } from "./application/ListInsights.js";
+import { SeedSimulatedBrand } from "./application/SeedSimulatedBrand.js";
+import { BackfillSalesTrend } from "./application/BackfillSalesTrend.js";
 import { buildAiTools } from "./application/ai/aiTools.js";
 import { AiOrchestrator } from "./application/ai/AiOrchestrator.js";
 import { GenerateDailyInsights } from "./application/ai/GenerateDailyInsights.js";
@@ -72,4 +74,6 @@ export const useCases = {
   aiOrchestrator,
   generateDailyInsights: new GenerateDailyInsights(aiOrchestrator, insightRepo, llmProviderLabel),
   listInsights: new ListInsights(insightRepo),
+  seedSimulatedBrand: new SeedSimulatedBrand(productProfileRepo),
+  backfillSalesTrend: new BackfillSalesTrend(dataSource, snapshotRepo),
 };

@@ -9,6 +9,7 @@ interface SalesSnapshotDocument {
   productName: string;
   unitsSold: number;
   capturedAt: Date;
+  source: SalesSnapshot["source"];
 }
 
 export class MongoSalesSnapshotRepository implements SalesSnapshotRepository {
@@ -31,6 +32,7 @@ export class MongoSalesSnapshotRepository implements SalesSnapshotRepository {
       productName: doc["productName"] as string,
       unitsSold: doc["unitsSold"] as number,
       capturedAt: doc["capturedAt"] as Date,
+      source: (doc["source"] as SalesSnapshot["source"] | undefined) ?? "real",
     }));
   }
 }

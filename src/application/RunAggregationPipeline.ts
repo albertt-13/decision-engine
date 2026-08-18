@@ -26,6 +26,7 @@ export class RunAggregationPipeline {
         productName: p.name,
         unitsSold: p.unitsSold,
         capturedAt,
+        source: "real" as const,
       }));
 
     await this.snapshotRepo.saveMany(snapshots);

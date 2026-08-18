@@ -11,4 +11,9 @@ export const catalogController = {
     const profiles = await useCases.listProductProfiles.execute();
     res.status(200).json(profiles);
   },
+
+  async seedDemoBrands(_req: Request, res: Response) {
+    const result = await useCases.seedSimulatedBrand.execute();
+    res.status(200).json(result);
+  },
 };

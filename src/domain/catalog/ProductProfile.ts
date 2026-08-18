@@ -78,6 +78,14 @@ export interface ProductProfile {
   /** Nomenclatura CAT-SUB-#### — ver ProductCategorizer.ts */
   sku: string;
   orderFlowProductId: string;
+  /**
+   * "OrderFlow" para el catálogo real. Cualquier otro valor es una marca
+   * 100% simulada (catálogo + marketing + canales) sembrada para mostrar
+   * variedad — ver `demoBrands.ts` y `SeedSimulatedBrand.ts`. No es
+   * multi-tenancy real: no hay aislamiento de datos ni auth por marca,
+   * es una dimensión de agrupación en el mismo catálogo single-tenant.
+   */
+  brand: string;
   name: string;
   price: string;
   category: CategoryRef;

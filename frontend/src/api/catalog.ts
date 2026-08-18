@@ -10,3 +10,8 @@ export async function syncCatalog(): Promise<SyncCatalogResult> {
   const { data } = await apiClient.post<SyncCatalogResult>("/catalog/sync");
   return data;
 }
+
+export async function seedDemoBrands(): Promise<SyncCatalogResult> {
+  const { data } = await apiClient.post<SyncCatalogResult>("/catalog/seed-demo-brands");
+  return data;
+}

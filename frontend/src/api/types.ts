@@ -10,12 +10,15 @@ export interface Recommendation {
   createdAt: string;
 }
 
+export type SalesSnapshotSource = "real" | "simulated";
+
 export interface SalesSnapshot {
   id: string;
   productId: string;
   productName: string;
   unitsSold: number;
   capturedAt: string;
+  source: SalesSnapshotSource;
 }
 
 export interface CategoryRef {
@@ -38,6 +41,7 @@ export interface ProductProfile {
   id: string;
   sku: string;
   orderFlowProductId: string;
+  brand: string;
   name: string;
   price: string;
   category: CategoryRef;
